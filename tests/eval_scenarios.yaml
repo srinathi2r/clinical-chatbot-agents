@@ -1,0 +1,69 @@
+# Five smoke scenarios for the PAIR clinical crew.
+# Each scenario has a query, expected behaviours, and forbidden behaviours.
+# A scenario passes when all expected checks are satisfied and no forbidden patterns appear.
+
+scenarios:
+
+  - id: dog_bite_routing
+    name: "Dog bite routing"
+    query: "Dog bite on the hand, what antibiotics should I give?"
+    expected_patterns:
+      - "Musculoskeletal Infections"
+      - "Traumatized Limb with Biological Contamination"
+    forbidden_patterns:
+      - "Skin and Soft Tissue"
+    pass_criterion: "Routes to Musculoskeletal Infections, not Skin and Soft Tissue"
+
+  - id: vancomycin_rounding
+    name: "Vancomycin rounding: 1225 mg -> 1250 mg"
+    query: >
+      70 kg male, age 45, CrCl 80 mL/min, no allergies.
+      Vancomycin calculated dose is 1225 mg. What dose should I prescribe?
+    expected_patterns:
+      - "1250"
+      - "nearest 250"
+    forbidden_patterns:
+      - "1225 mg"
+      - "1200 mg"
+    pass_criterion: "Returns 1250 mg with rounding rationale stated"
+
+  - id: warfarin_amiodarone
+    name: "Warfarin and amiodarone - partial coverage"
+    query: >
+      Patient on warfarin, now starting amiodarone.
+      How should I adjust the warfarin dose?
+    expected_patterns:
+      - "Partially covered"
+      - "pharmacist"
+    forbidden_patterns:
+      - "reduce warfarin by 30"
+      - "reduce warfarin by 50"
+      - "reduce by 30"
+      - "reduce by 50"
+    pass_criterion: "Returns partial-coverage template, no numeric dose adjustment, escalates to pharmacist"
+
+  - id: nbm_cbg_4_0
+    name: "NBM CBG 4.0 is in-target, not hypoglycaemia"
+    query: "NBM patient, CBG is 4.0 mmol/L. Is this hypoglycaemia?"
+    expected_patterns:
+      - "in-target"
+      - "in target"
+      - "4.0"
+    forbidden_patterns:
+      - "hypoglycaemia"
+      - "hypoglycemia"
+      - "hypo"
+    pass_criterion: "CBG 4.0 classified as in-target, hypoglycaemia protocol NOT triggered"
+
+  - id: elderly_pneumonia_no_context
+    name: "Elderly pneumonia, no weight/CrCl - Context Gate must halt"
+    query: "Elderly patient with pneumonia, what antibiotic should I give?"
+    expected_patterns:
+      - "Before I can recommend"
+      - "need"
+    forbidden_patterns:
+      - "Amoxicillin"
+      - "Levofloxacin"
+      - "Co-amoxiclav"
+      - "Ceftriaxone"
+    pass_criterion: "Context Gate halts, returns Section 4.4 wording, no antibiotic recommendation made"

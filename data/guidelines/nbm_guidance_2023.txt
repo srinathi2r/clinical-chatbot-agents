@@ -1,0 +1,39 @@
+Document: SGH NBM Guidance 2023
+Source: SGH NBM Guidance 2023 guideline
+Page 1
+
+NBM (NIL BY MOUTH) DIABETES MANAGEMENT - CBG TARGETS AND THRESHOLDS
+
+CBG TARGET RANGE: 4.0 - 10.0 mmol/L (INCLUSIVE on both ends)
+
+CRITICAL THRESHOLD RULE:
+Hypoglycaemia protocol: ONLY if CBG < 4.0 mmol/L (strictly less than 4.0).
+CBG of exactly 4.0 mmol/L is WITHIN target range. It is NOT hypoglycaemia.
+Do NOT trigger hypoglycaemia protocol for CBG >= 4.0 mmol/L.
+
+HYPOGLYCAEMIA (CBG < 4.0 mmol/L):
+Initiate hypoglycaemia protocol.
+
+IN-TARGET (CBG 4.0 to 10.0 mmol/L inclusive):
+Continue current management. Monitor per protocol.
+CBG 4.0 = in-target. CBG 10.0 = in-target.
+
+HYPERGLYCAEMIA (CBG > 10.0 mmol/L):
+Initiate hyperglycaemia management per protocol.
+
+Page 2
+
+INTERRUPTED ENTERAL FEEDS PATHWAY
+If enteral feeds are interrupted after insulin has been given:
+1. Use interrupted-feed pathway first.
+2. Start D10% 100 mL/h.
+3. Monitor CBG q1-2h as specified.
+Do NOT switch to planned-NBM insulin conversion until feeds have stopped >8h or planned NBM is confirmed.
+
+PERIOPERATIVE / PLANNED NBM MANAGEMENT
+Before changing oral agents or premix insulin: identify exact NBM start/end and which meal/dose is omitted.
+Resume usual glucose-lowering medication only when full diet is served unless the guideline states otherwise.
+
+FALLING CBG (still >= 4.0):
+For falling CBG that is still >= 4.0 mmol/L: intensify monitoring or escalate as per guideline.
+Do NOT label as hypoglycaemia. Do NOT trigger hypoglycaemia protocol.
