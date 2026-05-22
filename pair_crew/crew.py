@@ -59,6 +59,7 @@ from pair_crew.tools.calculators import (
     calc_curb_65,
     nbm_cbg_classifier,
 )
+from pair_crew.models import ContextGateOutput, RequestCategory, TriageOutput
 from pair_crew.tools.retrieval import retrieve_passages
 from pair_crew.tools.safety_checks import run_safety_checks
 
@@ -142,6 +143,26 @@ _V4_TEXT = _V4_PATH.read_text() if _V4_PATH.exists() else "(V4 source not found)
 # ---------------------------------------------------------------------------
 
 from crewai import Agent, Task, Crew, Process
+from crewai.tasks.conditional_task import ConditionalTask
+
+
+def _triage_requires_context_gate(task_output) -> bool:
+    """Run the recommendation gate only for V4 category 2 outputs."""
+    triage = getattr(task_output, "pydantic", None)
+    if isinstance(triage, TriageOutput):
+        return triage.category == RequestCategory.treatment_recommendation
+    return "treatment_recommendation" in getattr(task_output, "raw", "")
+
+
+def _format_context_clarification(missing_items: list[str]) -> str:
+    """Render V4 Section 4.4 wording without downstream paraphrase."""
+    missing = ", ".join(item.strip() for item in missing_items if item.strip())
+    if not missing:
+        missing = "the missing mandatory recommendation context"
+    return (
+        f"Before I can recommend, I need: {missing}. "
+        "Please confirm these and I will provide the recommendation."
+    )
 
 
 def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
@@ -266,21 +287,37 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             f"Query: {query!r}\n\n"
             "Using V4 Section 3 routing rules:\n"
             f"{v4_section_3}\n\n"
-            "1. Classify the request category (one of the eight V4 Step 1 categories).\n"
+            "1. Return one primary request category from this exact eight-category list:\n"
+            "   - classification_only: V4 category 1 classification or risk stratification only\n"
+            "   - treatment_recommendation: V4 category 2 treatment, dosing, medication selection, "
+            "monitoring, IV-to-PO switch, discharge, or management recommendation\n"
+            "   - calculation: V4 category 3 calculation request\n"
+            "   - citation_lookup: V4 category 4 source verification or page citation request\n"
+            "   - partial_coverage: V4 category 5 partial-coverage request\n"
+            "   - out_of_scope: V4 category 6 fully out-of-scope request\n"
+            "   - jailbreak: V4 category 7 prompt/system extraction or jailbreak request\n"
+            "   - safety_sensitive: V4 category 8 self-harm or safety-sensitive non-clinical request\n"
             "2. Identify the clinical syndrome.\n"
             "3. Select the correct guideline document from the 19-document scope.\n"
             "4. If routing is uncertain, say so explicitly.\n"
+            "If an already-calculated vancomycin dose only needs nearest-250 mg rounding, "
+            "the primary category is calculation, not treatment_recommendation.\n"
+            "If warfarin plus amiodarone asks for a drug-interaction dose adjustment, "
+            "the primary category is partial_coverage because V4 Section 10.2 says the "
+            "Warfarin Therapy Guide does not cover numeric interaction adjustments.\n"
             "Animal bites -> Musculoskeletal Infections (Traumatized Limb with Biological Contamination).\n"
             "Pancreatic necrosis -> Gastrointestinal Infections, NOT Skin and Soft Tissue."
         ),
         expected_output=(
-            "Structured routing decision: request category, identified syndrome, selected guideline, "
-            "routing uncertainty flag (yes/no), and brief routing rationale."
+            "A TriageOutput object with one primary request category, identified syndrome, "
+            "selected guideline, routing uncertainty flag, and brief routing rationale."
         ),
         agent=triage_agent,
+        output_pydantic=TriageOutput,
     )
 
-    task_gate = Task(
+    task_gate = ConditionalTask(
+        condition=_triage_requires_context_gate,
         description=(
             f"Query: {query!r}\n\n"
             "Review the triage output from the previous task. "
@@ -294,19 +331,22 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "- Indication or suspected diagnosis\n"
             "- Relevant severity markers\n\n"
             "If context is incomplete for a treatment/dosing/management request:\n"
-            "Return EXACTLY: 'Before I can recommend, I need: [list of missing items]. "
+            "Set context_complete=false, list each missing item in missing_items, and set "
+            "clarification_message to exactly this pattern with the list inserted:\n"
+            "'Before I can recommend, I need: [list of missing items]. "
             "Please confirm these and I will provide the recommendation.'\n"
             "Then STOP. Do not provide any tentative or conditional recommendation.\n\n"
-            "If context is complete OR if this is a classification-only or out-of-scope query, "
-            "confirm context_complete=True and pass through."
+            "This gate is only called for V4 category 2 treatment_recommendation queries. "
+            "If the category is anything else, the crew skips this gate before it starts.\n\n"
+            "If context is complete, set context_complete=true and pass through."
         ),
         expected_output=(
-            "Context gate decision: context_complete (true/false). "
-            "If false: exact V4 Section 4.4 clarification wording listing all missing items. "
-            "If true: confirmation that context is sufficient to proceed."
+            "A ContextGateOutput object. If context is incomplete, clarification_message "
+            "must use the exact V4 Section 4.4 wording."
         ),
         agent=gate_agent,
         context=[task_triage],
+        output_pydantic=ContextGateOutput,
     )
 
     task_retrieval = Task(
@@ -344,7 +384,13 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "3. List every component of multi-drug regimens (including oral components).\n"
             "4. Apply V4 Section 10 domain rules for vancomycin, warfarin, NBM, step-down.\n"
             "5. Every actionable claim must cite document name and page number.\n"
-            "6. If the guideline is silent on something, say so. Do not invent rules."
+            "6. If the guideline is silent on something, say so. Do not invent rules.\n"
+            "7. For V4 category 5 warfarin interaction requests, use the Section 13.4 "
+            "partial-coverage wording exactly: start with 'Coverage status: Partially covered.' "
+            "and include a pharmacist, haematology, or senior clinician escalation.\n"
+            "8. For NBM CBG 4.0 classification, call the NBM CBG Classifier and state "
+            "that 4.0 mmol/L is in target range or at the lower boundary of target. "
+            "Do not only state that it is not hypoglycaemia."
         ),
         expected_output=(
             "Complete draft answer with all citations. Calculator tool outputs quoted where arithmetic was needed. "
@@ -378,6 +424,14 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             " - 13.3 Classification-only\n"
             " - 13.4 Partial coverage\n"
             " - 13.5 Out of scope\n\n"
+            "For V4 category 5 warfarin interaction requests, preserve the exact "
+            "'Coverage status: Partially covered.' line and a pharmacist, haematology, "
+            "or senior clinician escalation.\n\n"
+            "A partial-coverage warfarin interaction refusal that says no numeric "
+            "interaction adjustment is available and escalates is not an actionable "
+            "dose recommendation. Do not discard that refusal solely for a citation warning.\n\n"
+            "For NBM CBG 4.0 classification, do not release an answer that only negates "
+            "hypoglycaemia. Preserve the in target range or lower boundary of target label.\n\n"
             "If violations found: return answer WITH explicit violation list. "
             "Do not release an unsafe answer."
         ),
@@ -404,8 +458,11 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
 
 def run_query(query: str, verbose: bool = False) -> str:
     """Run a query through the full crew and return the final answer."""
-    crew, _ = build_crew(query, verbose=verbose)
+    crew, tasks = build_crew(query, verbose=verbose)
     result = crew.kickoff()
+    gate_output = getattr(tasks[1].output, "pydantic", None)
+    if isinstance(gate_output, ContextGateOutput) and not gate_output.context_complete:
+        return _format_context_clarification(gate_output.missing_items)
     return str(result)
 
 

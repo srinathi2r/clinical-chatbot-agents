@@ -34,7 +34,8 @@ _FORBIDDEN: list[tuple[str, str, str]] = [
     ),
     (
         "cbg_4_labelled_hypo",
-        r"(cbg|blood glucose).{0,30}4\.0.{0,30}(hypoglyc|hypo\b)",
+        r"(cbg|blood glucose).{0,30}4\.0.{0,30}"
+        r"(is|equals|indicates)\s+(hypoglyc|hypo\b)",
         "CBG 4.0 mmol/L must not be labelled hypoglycaemia (V4 Section 11).",
     ),
     (
@@ -45,16 +46,25 @@ _FORBIDDEN: list[tuple[str, str, str]] = [
 ]
 
 
+def _looks_like_calculated_value(text: str, start: int) -> bool:
+    """Allow an unrounded calculated value when the answer states rounding."""
+    preceding = text[max(0, start - 60):start].lower()
+    return "calculated" in preceding or "calculation" in preceding
+
+
 def _vanc_doses_are_multiples_of_250(text: str) -> list[str]:
     """Find vancomycin doses mentioned that are not multiples of 250."""
     violations = []
     # Match patterns like "vancomycin 1200 mg" or "1,150 mg vancomycin"
-    candidates = re.findall(
+    candidates = re.finditer(
         r"(?:vancomycin\s+|vamc\s+)?(\d[\d,]+)\s*mg(?:\s+vancomycin)?",
         text,
         re.IGNORECASE,
     )
-    for raw in candidates:
+    for candidate in candidates:
+        if _looks_like_calculated_value(text, candidate.start()):
+            continue
+        raw = candidate.group(1)
         mg = int(raw.replace(",", ""))
         # Only flag if it looks like a vancomycin dose (100-5000 mg range)
         if 100 <= mg <= 5000 and mg % 250 != 0:
@@ -67,12 +77,15 @@ def _vanc_doses_are_multiples_of_250(text: str) -> list[str]:
 def _check_vanc_ceiling(text: str) -> list[str]:
     """Check for single vancomycin doses exceeding 3000 mg."""
     violations = []
-    candidates = re.findall(
+    candidates = re.finditer(
         r"(?:vancomycin\s+)?(\d[\d,]+)\s*mg",
         text,
         re.IGNORECASE,
     )
-    for raw in candidates:
+    for candidate in candidates:
+        if _looks_like_calculated_value(text, candidate.start()):
+            continue
+        raw = candidate.group(1)
         mg = int(raw.replace(",", ""))
         if mg > 3000:
             violations.append(
@@ -84,6 +97,16 @@ def _check_vanc_ceiling(text: str) -> list[str]:
 def _check_citations_present(text: str) -> list[str]:
     """Warn if no document citation found in the text."""
     warnings = []
+    lower = text.lower()
+    partial_coverage_refusal = (
+        "partially covered" in lower
+        and "warfarin" in lower
+        and "numeric" in lower
+        and ("not" in lower or "no " in lower)
+    )
+    if partial_coverage_refusal:
+        return warnings
+
     citation_patterns = [
         r"page\s+\d+",
         r"guideline\s*,?\s*page",

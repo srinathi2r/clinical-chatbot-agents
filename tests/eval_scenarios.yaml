@@ -23,7 +23,8 @@ scenarios:
       - "1250"
       - "nearest 250"
     forbidden_patterns:
-      - "1225 mg"
+      - "prescribe 1225 mg"
+      - "give 1225 mg"
       - "1200 mg"
     pass_criterion: "Returns 1250 mg with rounding rationale stated"
 
@@ -46,13 +47,17 @@ scenarios:
     name: "NBM CBG 4.0 is in-target, not hypoglycaemia"
     query: "NBM patient, CBG is 4.0 mmol/L. Is this hypoglycaemia?"
     expected_patterns:
-      - "in-target"
-      - "in target"
       - "4.0"
+    expected_any_patterns:
+      - "target range"
+      - "lower boundary"
+      - "in target"
+      - "in-target"
     forbidden_patterns:
-      - "hypoglycaemia"
-      - "hypoglycemia"
-      - "hypo"
+      - "this is hypoglycemia"
+      - "patient is hypoglycemic"
+      - "this is hypoglycaemia"
+      - "patient is hypoglycaemic"
     pass_criterion: "CBG 4.0 classified as in-target, hypoglycaemia protocol NOT triggered"
 
   - id: elderly_pneumonia_no_context

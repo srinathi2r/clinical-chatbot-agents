@@ -33,6 +33,13 @@ def check_scenario(answer: str, scenario: dict) -> tuple[bool, str]:
         if not re.search(re.escape(pattern.lower()), answer_lower):
             missing_expected.append(pattern)
 
+    any_patterns = scenario.get("expected_any_patterns", [])
+    if any_patterns and not any(
+        re.search(re.escape(pattern.lower()), answer_lower)
+        for pattern in any_patterns
+    ):
+        missing_expected.append("one of " + ", ".join(any_patterns))
+
     for pattern in scenario.get("forbidden_patterns", []):
         if re.search(re.escape(pattern.lower()), answer_lower):
             hit_forbidden.append(pattern)
