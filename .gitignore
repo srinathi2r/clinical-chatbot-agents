@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/vector_index/
+prompts/v4_source_of_truth.md
