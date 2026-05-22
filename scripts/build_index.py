@@ -12,12 +12,15 @@ GUIDELINES_DIR = Path("data/guidelines")
 INDEX_DIR = Path(os.getenv("CHROMA_INDEX_PATH", "data/vector_index"))
 COLLECTION_NAME = "pair_guideline_pages"
 EXPECTED_PDFS = (
-    "Respiratory_Infections.pdf",
-    "Vancomycin_TDM_non_ESRF.pdf",
-    "Warfarin_Therapy_Guide.pdf",
-    "Musculoskeletal_Infections.pdf",
-    "NBM_Guidance_2023.pdf",
+    "Infections_Respiratory.pdf",
+    "Vancomycin Algorithm_doctor ver.pdf",
+    "Warfarin Therapy Guide.pdf",
+    "Infections_Musculoskeletal.pdf",
+    "SGH NBM Guidance 2018.pdf",
 )
+# NOTE: "SGH NBM Guidance 2018.pdf" is the available file; eval scenarios reference
+# NBM_Guidance_2023.pdf. Deterministic CBG rules live in calculators.py and are
+# not affected by this discrepancy, but LLM citations will cite the 2018 document.
 
 
 def embedding_provider() -> str:
@@ -110,7 +113,7 @@ def build_index() -> int:
         client = chromadb.PersistentClient(path=str(INDEX_DIR))
         try:
             client.delete_collection(COLLECTION_NAME)
-        except ValueError:
+        except Exception:
             pass
         collection = client.create_collection(
             name=COLLECTION_NAME,
