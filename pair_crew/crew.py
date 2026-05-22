@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()
+os.environ.setdefault("CREWAI_STORAGE_DIR", str(Path("data/crewai_storage").resolve()))
 
 # ---------------------------------------------------------------------------
 # LLM setup - one shared model for all five agents

@@ -20,7 +20,11 @@ _FORBIDDEN: list[tuple[str, str, str]] = [
     # (rule_name, regex_pattern, explanation)
     (
         "warfarin_numeric_reduction",
-        r"(reduce|decrease|lower)\s+warfarin\s+(dose|by)\s+\d+",
+        r"warfarin.{0,80}\d+\s*(%|percent|mg).{0,40}(reduc|decreas|lower)"
+        r"|"
+        r"(reduce|reduc|decreas|lower).{0,40}warfarin.{0,40}\d+\s*(%|percent|mg)"
+        r"|"
+        r"warfarin.{0,40}(reduce|decreas|lower).{0,40}\d+\s*(%|percent|mg)",
         "Numeric warfarin dose reduction is forbidden (V4 Section 11). Use partial-coverage template.",
     ),
     (
