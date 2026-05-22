@@ -2,10 +2,11 @@
 
 The clinical guideline PDFs are not committed to this repository for licensing reasons.
 
-Place these five files in this directory before running `python scripts/build_index.py`:
+Place these six files in this directory before running `python scripts/build_index.py`:
 
-- `Respiratory_Infections.pdf`
-- `Vancomycin_TDM_non_ESRF.pdf`
-- `Warfarin_Therapy_Guide.pdf`
-- `Musculoskeletal_Infections.pdf`
-- `NBM_Guidance_2023.pdf`
+- `Infections_Respiratory.pdf`
+- `Vancomycin Algorithm_doctor ver.pdf`
+- `Warfarin Therapy Guide.pdf`
+- `Infections_Musculoskeletal.pdf`
+- `Infections_Gastrointestinal.pdf`
+- `SGH NBM Guidance 2018.pdf`

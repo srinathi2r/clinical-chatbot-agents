@@ -4,6 +4,7 @@ from pair_crew.crew import (
     _format_context_clarification,
     _format_prompt_extraction_refusal,
     _is_already_calculated_vanc_query,
+    _is_routing_only_query,
     _triage_requires_context_gate,
 )
 from pair_crew.models import RequestCategory, TriageOutput
@@ -36,6 +37,16 @@ def test_context_gate_skips_already_calculated_vanc_rounding_query() -> None:
     assert not _triage_requires_context_gate(
         _triage(RequestCategory.treatment_recommendation),
         "Vancomycin calculated dose is 1225 mg. What rounded dose should I use?",
+    )
+
+
+def test_context_gate_skips_routing_only_query() -> None:
+    query = "Routing check only: CT shows gas in pancreatic necrosis. Which guideline should I use?"
+
+    assert _is_routing_only_query(query)
+    assert not _triage_requires_context_gate(
+        _triage(RequestCategory.treatment_recommendation),
+        query,
     )
 
 

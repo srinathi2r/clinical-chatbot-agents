@@ -108,7 +108,14 @@ def tool_curb65(
 def tool_cbg(cbg_mmol_l: float) -> str:
     """Classify CBG as hypoglycaemia / in-target / hyperglycaemia per V4 Section 10.3."""
     r = nbm_cbg_classifier(cbg_mmol_l)
-    return r.rationale
+    retrieval = retrieve_passages(
+        "SGH NBM Guidance CBG hypoglycaemia target range",
+        top_k=1,
+    )
+    citation = ""
+    if retrieval.passages:
+        citation = f"\nPreserve this NBM source citation: {retrieval.passages[0].citation}."
+    return r.rationale + citation
 
 
 @tool("Guideline Retrieval")
@@ -167,9 +174,15 @@ def _is_already_calculated_vanc_query(query: str) -> bool:
     )
 
 
+def _is_routing_only_query(query: str) -> bool:
+    """Recognize source-routing checks that must not enter the recommendation gate."""
+    lower = query.lower()
+    return "routing check" in lower or "which guideline" in lower
+
+
 def _triage_requires_context_gate(task_output, query: str = "") -> bool:
     """Run the recommendation gate only for V4 category 2 outputs."""
-    if _is_already_calculated_vanc_query(query):
+    if _is_already_calculated_vanc_query(query) or _is_routing_only_query(query):
         return False
     triage = getattr(task_output, "pydantic", None)
     if isinstance(triage, TriageOutput):
@@ -420,7 +433,8 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "6. If the guideline is silent on something, say so. Do not invent rules.\n"
             "7. For V4 category 5 warfarin interaction requests, use the Section 13.4 "
             "partial-coverage wording exactly: start with 'Coverage status: Partially covered.' "
-            "and include a pharmacist, haematology, or senior clinician escalation.\n"
+            "and include an escalation to a pharmacist, haematology, or senior clinician. "
+            "Use one of those exact escalation terms.\n"
             "8. For vancomycin rounding or ceiling calculations, call the Vancomycin "
             "Dose Rounder and cite the retrieved applicable vancomycin document and "
             "page for the nearest-250 mg rule and ceiling. The calculator supplies "
@@ -438,7 +452,11 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "classification. The calculator supplies the deterministic label but "
             "is not the citation source. For CBG 4.0, state that 4.0 mmol/L is in "
             "target range or at the lower boundary of target. Do not only state "
-            "that it is not hypoglycaemia."
+            "that it is not hypoglycaemia.\n"
+            "12. For animal bite antibiotic regimens routed to Musculoskeletal "
+            "Infections, state that the cited passage is the Traumatized Limb with "
+            "Biological Contamination passage so the non-obvious routing remains "
+            "visible in the final answer."
         ),
         expected_output=(
             "Complete draft answer with all citations. Calculator tool outputs quoted where arithmetic was needed. "
@@ -474,7 +492,7 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             " - 13.5 Out of scope\n\n"
             "For V4 category 5 warfarin interaction requests, preserve the exact "
             "'Coverage status: Partially covered.' line and a pharmacist, haematology, "
-            "or senior clinician escalation.\n\n"
+            "or senior clinician escalation. Use one of those exact escalation terms.\n\n"
             "A partial-coverage warfarin interaction refusal that says no numeric "
             "interaction adjustment is available and escalates is not an actionable "
             "dose recommendation. Do not discard that refusal solely for a citation warning.\n\n"
@@ -488,6 +506,9 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "severity label. Do not replace it with a point count inferred from a "
             "retrieved Respiratory passage. Preserve the Respiratory document and page "
             "citation for the severity mapping.\n\n"
+            "For animal bite antibiotic regimens, preserve the Musculoskeletal "
+            "Infections routing explanation and the Traumatized Limb with Biological "
+            "Contamination passage label in the released answer.\n\n"
             "For any deterministic NBM CBG classification, the released response "
             "must include the retrieved SGH NBM Guidance document name and page "
             "citation. The NBM CBG Classifier result alone is not a citation. If "

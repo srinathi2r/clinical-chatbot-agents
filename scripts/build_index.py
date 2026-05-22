@@ -16,6 +16,7 @@ EXPECTED_PDFS = (
     "Vancomycin Algorithm_doctor ver.pdf",
     "Warfarin Therapy Guide.pdf",
     "Infections_Musculoskeletal.pdf",
+    "Infections_Gastrointestinal.pdf",
     "SGH NBM Guidance 2018.pdf",
 )
 # NOTE: "SGH NBM Guidance 2018.pdf" is the available file; eval scenarios reference

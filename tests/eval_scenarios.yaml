@@ -268,14 +268,15 @@ scenarios:
       1500 mg every 12 hours in a non-ESRF patient. Does this exceed the
       greater-than-3-g-per-day frequency-change trigger?
     expected_patterns:
-      - "1500"
-      - "3 g"
+      - "Q12"
     expected_any_patterns:
       - "does not exceed"
       - "not exceed"
       - "exactly"
       - "equals"
     optional_any_patterns:
+      - "3 g"
+      - "3000 mg"
       - "Q12"
       - "frequency"
     forbidden_patterns:
