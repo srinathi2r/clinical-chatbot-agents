@@ -35,6 +35,21 @@ def test_safety_rejects_affirmative_cbg_4_hypoglycaemia_statement() -> None:
     assert not result.passed
 
 
+def test_safety_rejects_cbg_classification_without_nbm_page_citation() -> None:
+    result = run_safety_checks("CBG 3.8 mmol/L is hypoglycaemia.")
+
+    assert not result.passed
+    assert any("SGH NBM Guidance" in violation for violation in result.violations)
+
+
+def test_safety_allows_cbg_classification_with_nbm_page_citation() -> None:
+    result = run_safety_checks(
+        "CBG 3.8 mmol/L is hypoglycaemia. Source: SGH NBM Guidance 2023, page 1."
+    )
+
+    assert result.passed
+
+
 def test_safety_does_not_warn_on_warfarin_partial_coverage_refusal() -> None:
     result = run_safety_checks(
         "Coverage status: Partially covered. Warfarin numeric interaction "

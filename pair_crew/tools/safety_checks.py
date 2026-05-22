@@ -96,6 +96,28 @@ def _check_vanc_ceiling(text: str) -> list[str]:
     return violations
 
 
+def _check_cbg_nbm_citation(text: str) -> list[str]:
+    """Require NBM source and page when a response classifies a CBG."""
+    classification_pattern = (
+        r"(?:cbg|blood glucose).{0,120}"
+        r"(?:hypoglyc|in[- ]?target|target range|hyperglyc|below\s+4\.0)"
+    )
+    if not re.search(classification_pattern, text, re.IGNORECASE | re.DOTALL):
+        return []
+
+    nbm_citation_pattern = (
+        r"(?:SGH\s+NBM|NBM(?:[_\s-]+Guidance)?).{0,120}page\s+\d+"
+        r"|page\s+\d+.{0,120}(?:SGH\s+NBM|NBM(?:[_\s-]+Guidance)?)"
+    )
+    if re.search(nbm_citation_pattern, text, re.IGNORECASE | re.DOTALL):
+        return []
+
+    return [
+        "[cbg_nbm_citation] Deterministic CBG classification requires an "
+        "SGH NBM Guidance document name and page citation."
+    ]
+
+
 def _check_citations_present(text: str) -> list[str]:
     """Warn if no document citation found in the text."""
     warnings = []
@@ -144,6 +166,7 @@ def run_safety_checks(response_text: str) -> SafetyCheckResult:
 
     violations.extend(_vanc_doses_are_multiples_of_250(response_text))
     violations.extend(_check_vanc_ceiling(response_text))
+    violations.extend(_check_cbg_nbm_citation(response_text))
     warnings.extend(_check_citations_present(response_text))
 
     return SafetyCheckResult(
