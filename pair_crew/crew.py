@@ -18,23 +18,32 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# LLM setup - support both OpenAI and Anthropic
+# LLM setup - one shared model for all five agents
 # ---------------------------------------------------------------------------
+
+_DEFAULT_MODELS = {
+    "openai": "gpt-4o",
+    "anthropic": "claude-sonnet-4-6",
+}
+
 
 def _get_llm():
     from crewai import LLM
-    model = os.getenv("CREW_LLM_MODEL", "gpt-4o")
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
-    openai_key = os.getenv("OPENAI_API_KEY", "")
 
-    if model.startswith("claude") and anthropic_key and not anthropic_key.startswith("sk-ant-..."):
-        return LLM(model=f"anthropic/{model}", api_key=anthropic_key)
-    elif openai_key and not openai_key.startswith("sk-..."):
-        return LLM(model=model, api_key=openai_key)
-    else:
+    provider = os.getenv("LLM_PROVIDER", "openai").strip().lower()
+    if provider not in _DEFAULT_MODELS:
+        raise EnvironmentError("LLM_PROVIDER must be 'openai' or 'anthropic'.")
+
+    model = os.getenv("LLM_MODEL", _DEFAULT_MODELS[provider]).strip()
+    key_env_var = "OPENAI_API_KEY" if provider == "openai" else "ANTHROPIC_API_KEY"
+    api_key = os.getenv(key_env_var, "").strip()
+    if not api_key or api_key in {"sk-...", "sk-ant-..."}:
         raise EnvironmentError(
-            "No valid API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env"
+            f"Missing {key_env_var} for LLM_PROVIDER={provider}. "
+            f"Set {key_env_var} before starting the crew."
         )
+
+    return LLM(model=f"{provider}/{model}", api_key=api_key)
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +87,11 @@ def tool_curb65(
 ) -> str:
     """Calculate CURB-65 score and severity for pneumonia."""
     r = calc_curb_65(confusion, urea_mmol_l, respiratory_rate, systolic_bp, diastolic_bp, age)
-    return r.rationale + f"\nSeverity: {r.severity}"
+    return (
+        f"{r.rationale}\n"
+        f"Severity: {r.severity}\n"
+        f"Disposition: {r.disposition}"
+    )
 
 
 @tool("NBM CBG Classifier")
@@ -90,13 +103,13 @@ def tool_cbg(cbg_mmol_l: float) -> str:
 
 @tool("Guideline Retrieval")
 def tool_retrieve(query: str) -> str:
-    """Retrieve cited guideline passages from the FAISS index for a clinical query."""
+    """Retrieve cited guideline page passages from the Chroma index for a clinical query."""
     result = retrieve_passages(query)
     if not result.passages:
         return f"Coverage status: {result.coverage_status}. No passages found. {result.notes}"
     lines = [f"Coverage status: {result.coverage_status}\n"]
     for i, p in enumerate(result.passages, 1):
-        lines.append(f"[{i}] Source: {p.source}\n{p.text}\n")
+        lines.append(f"[{i}] Citation: {p.citation}\n{p.text}\n")
     return "\n".join(lines)
 
 

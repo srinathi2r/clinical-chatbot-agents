@@ -8,8 +8,8 @@ version = "0.1.0"
 description = "Agentic clinical chatbot using CrewAI over SingHealth/MOH guidelines"
 requires-python = ">=3.11"
 dependencies = [
-    "crewai>=0.80.0",
-    "crewai-tools>=0.14.0",
+    "crewai==1.14.4",
+    "crewai-tools==1.14.4",
     "anthropic>=0.40.0",
     "chromadb>=1.0.0",
     "openai>=1.50.0",

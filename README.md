@@ -23,11 +23,11 @@ This repo is testing whether separating those concerns into distinct agents, eac
 
 Five agents running sequentially under a CrewAI crew:
 
-1. **Triage and Routing** — classifies the query, picks the right guideline, flags routing uncertainty.
-2. **Context Gate** — enforces the mandatory pre-recommendation check; halts the crew if context is incomplete.
-3. **Retrieval and Citation** — pulls passages with document name and page number, labels coverage status.
-4. **Specialist and Calculator** — drafts the answer; calls deterministic Python functions for arithmetic.
-5. **Safety Review** — runs the final checklist, scans for forbidden output patterns, applies the right response template.
+1. **Triage and Routing**: classifies the query, picks the right guideline, flags routing uncertainty.
+2. **Context Gate**: enforces the mandatory pre-recommendation check; halts the crew if context is incomplete.
+3. **Retrieval and Citation**: pulls passages with document name and page number, labels coverage status.
+4. **Specialist and Calculator**: drafts the answer; calls deterministic Python functions for arithmetic.
+5. **Safety Review**: runs the final checklist, scans for forbidden output patterns, applies the right response template.
 
 Deterministic logic (Cockcroft-Gault CrCl, vancomycin rounding and ceiling, CURB-65, NBM CBG classification) lives in plain Python functions. The LLMs call them; they never do arithmetic.
 
@@ -37,10 +37,10 @@ Deterministic logic (Cockcroft-Gault CrCl, vancomycin rounding and ceiling, CURB
 
 ## Files in this repo
 
-- `ClaudeCode_Brief_CrewAI_Exploration.md` — the build brief handed to Claude Code to scaffold the project.
-- `Pair_Prompt_V4.docx` — the clinical spec (source of truth).
-- `data/sandbox_examples/` — selected Snowglobe simulation JSON files showing real failure cases the crew should prevent.
-- `pair_crew/` — Python package containing the CrewAI implementation (created as the project is built out).
+- `ClaudeCode_Brief_CrewAI_Exploration.md`: the build brief handed to Claude Code to scaffold the project.
+- `Pair_Prompt_V4.docx`: the clinical spec (source of truth).
+- `data/sandbox_examples/`: selected Snowglobe simulation JSON files showing real failure cases the crew should prevent.
+- `pair_crew/`: Python package containing the CrewAI implementation (created as the project is built out).
 
 ## Setup
 

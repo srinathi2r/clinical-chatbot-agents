@@ -1,27 +1,27 @@
-"""
-Retrieval tool: queries the FAISS vector index and returns cited passages.
-The FAISS index is built by scripts/build_index.py over data/guidelines/*.txt files.
-"""
+"""Page-level Chroma retrieval with guideline citation metadata."""
+
 from __future__ import annotations
 
 import os
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
-FAISS_INDEX_PATH = Path(os.getenv("FAISS_INDEX_PATH", "data/faiss_index"))
-TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
+COLLECTION_NAME = "pair_guideline_pages"
+INDEX_DIR = Path(os.getenv("CHROMA_INDEX_PATH", "data/vector_index"))
+TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "4"))
 
 
 @dataclass
 class CitedPassage:
     text: str
-    source: str
-    score: float = 0.0
+    document_name: str
+    page_number: int
+    source_path: str
+    distance: float | None = None
 
     @property
     def citation(self) -> str:
-        return self.source.replace("_", " ").replace(".txt", "")
+        return f"{self.document_name}, page {self.page_number}"
 
 
 @dataclass
@@ -32,44 +32,72 @@ class RetrievalResult:
     notes: str = ""
 
 
+def embedding_provider() -> str:
+    """Return the approved configured embedding provider."""
+    provider = os.getenv("EMBEDDING_PROVIDER", "openai").strip().lower()
+    if provider not in {"openai", "local"}:
+        raise ValueError("EMBEDDING_PROVIDER must be 'openai' or 'local'")
+    return provider
+
+
+def embedding_function(provider: str):
+    """Create the Chroma query embedding function for a stored index."""
+    from chromadb.utils.embedding_functions import (
+        OpenAIEmbeddingFunction,
+        SentenceTransformerEmbeddingFunction,
+    )
+
+    if provider == "local":
+        return SentenceTransformerEmbeddingFunction(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            device="cpu",
+        )
+    return OpenAIEmbeddingFunction(
+        api_key_env_var="OPENAI_API_KEY",
+        model_name="text-embedding-3-small",
+    )
+
+
 def retrieve_passages(query: str, top_k: int = TOP_K) -> RetrievalResult:
-    """
-    Query the FAISS index and return top_k cited passages.
-    Coverage status: 'directly_covered' when passages found, else 'not_covered'.
-    """
-    if not FAISS_INDEX_PATH.exists():
+    """Query page chunks and return cited top-k passages."""
+    if not INDEX_DIR.exists():
         return RetrievalResult(
             query=query,
-            coverage_status="not_covered",
-            notes=f"FAISS index not found at {FAISS_INDEX_PATH}. Run scripts/build_index.py first.",
+            notes=f"Chroma index not found at {INDEX_DIR}. Run scripts/build_index.py first.",
         )
 
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            from langchain_community.vectorstores import FAISS
-            from langchain_community.embeddings import HuggingFaceEmbeddings
+        import chromadb
 
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={"device": "cpu"},
+        client = chromadb.PersistentClient(path=str(INDEX_DIR))
+        collection = client.get_collection(
+            COLLECTION_NAME,
+            embedding_function=embedding_function(embedding_provider()),
         )
-        vectorstore = FAISS.load_local(
-            str(FAISS_INDEX_PATH),
-            embeddings,
-            allow_dangerous_deserialization=True,
+        result = collection.query(
+            query_texts=[query],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
         )
-        results = vectorstore.similarity_search_with_score(query, k=top_k)
     except Exception as exc:
-        return RetrievalResult(query=query, coverage_status="error", notes=str(exc))
+        return RetrievalResult(
+            query=query,
+            coverage_status="error",
+            notes=f"Retrieval failed: {exc}",
+        )
 
+    documents = result.get("documents", [[]])[0]
+    metadatas = result.get("metadatas", [[]])[0]
+    distances = result.get("distances", [[]])[0]
     passages = [
         CitedPassage(
-            text=doc.page_content,
-            source=doc.metadata.get("source", "unknown"),
-            score=float(score),
+            text=document,
+            document_name=str(metadata["document_name"]),
+            page_number=int(metadata["page_number"]),
+            source_path=str(metadata["source_path"]),
+            distance=float(distance) if distance is not None else None,
         )
-        for doc, score in results
+        for document, metadata, distance in zip(documents, metadatas, distances)
     ]
 
     coverage = "directly_covered" if passages else "not_covered"

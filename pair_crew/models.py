@@ -46,8 +46,9 @@ class ContextGateOutput(BaseModel):
 
 class CitedPassage(BaseModel):
     text: str
-    source: str
-    page_hint: str = ""
+    document_name: str
+    page_number: int
+    source_path: str
 
 
 class RetrievalOutput(BaseModel):
