@@ -6,3 +6,5 @@ data/vector_index/
 data/crewai_storage/
 data/guidelines/*.pdf
 prompts/v4_source_of_truth.md
+data/guidelines/*.pdf
+data/vector_index/
