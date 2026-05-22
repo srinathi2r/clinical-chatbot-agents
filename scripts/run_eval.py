@@ -24,31 +24,40 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 SCENARIOS_PATH = Path("tests/eval_scenarios.yaml")
 
 
-def check_scenario(answer: str, scenario: dict) -> tuple[bool, str]:
+def _has_any_pattern(answer_lower: str, patterns: list[str]) -> bool:
+    return any(
+        re.search(re.escape(pattern.lower()), answer_lower)
+        for pattern in patterns
+    )
+
+
+def check_scenario(answer: str, scenario: dict) -> tuple[bool, str, list[str]]:
     answer_lower = answer.lower()
     missing_expected = []
     hit_forbidden = []
+    optional_notes = []
 
     for pattern in scenario.get("expected_patterns", []):
         if not re.search(re.escape(pattern.lower()), answer_lower):
             missing_expected.append(pattern)
 
     any_patterns = scenario.get("expected_any_patterns", [])
-    if any_patterns and not any(
-        re.search(re.escape(pattern.lower()), answer_lower)
-        for pattern in any_patterns
-    ):
+    if any_patterns and not _has_any_pattern(answer_lower, any_patterns):
         missing_expected.append("one of " + ", ".join(any_patterns))
+
+    optional_patterns = scenario.get("optional_any_patterns", [])
+    if optional_patterns and not _has_any_pattern(answer_lower, optional_patterns):
+        optional_notes.append("Optional pattern not found: one of " + ", ".join(optional_patterns))
 
     for pattern in scenario.get("forbidden_patterns", []):
         if re.search(re.escape(pattern.lower()), answer_lower):
             hit_forbidden.append(pattern)
 
     if hit_forbidden:
-        return False, f"Forbidden pattern(s) found: {hit_forbidden}"
+        return False, f"Forbidden pattern(s) found: {hit_forbidden}", optional_notes
     if missing_expected:
-        return False, f"Expected pattern(s) not found: {missing_expected}"
-    return True, scenario.get("pass_criterion", "All checks passed")
+        return False, f"Expected pattern(s) not found: {missing_expected}", optional_notes
+    return True, scenario.get("pass_criterion", "All checks passed"), optional_notes
 
 
 def run_eval(scenario_id: str | None = None, verbose: bool = False) -> None:
@@ -75,10 +84,12 @@ def run_eval(scenario_id: str | None = None, verbose: bool = False) -> None:
             answer = run_query(s["query"], verbose=verbose)
             elapsed = time.time() - t0
 
-            passed, reason = check_scenario(answer, s)
+            passed, reason, optional_notes = check_scenario(answer, s)
             status = "PASS" if passed else "FAIL"
             print(f"Status: {status} ({elapsed:.1f}s)")
             print(f"Reason: {reason}")
+            for note in optional_notes:
+                print(f"Note: {note}")
             if not passed or verbose:
                 print(f"\nAnswer preview:\n{answer[:500]}{'...' if len(answer)>500 else ''}")
             results.append((s["id"], s["name"], passed, reason))

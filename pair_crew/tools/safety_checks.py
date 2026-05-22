@@ -55,16 +55,17 @@ def _looks_like_calculated_value(text: str, start: int) -> bool:
 def _vanc_doses_are_multiples_of_250(text: str) -> list[str]:
     """Find vancomycin doses mentioned that are not multiples of 250."""
     violations = []
-    # Match patterns like "vancomycin 1200 mg" or "1,150 mg vancomycin"
+    # Match amounts explicitly tied to vancomycin, not other antimicrobial doses.
     candidates = re.finditer(
-        r"(?:vancomycin\s+|vamc\s+)?(\d[\d,]+)\s*mg(?:\s+vancomycin)?",
+        r"(?:vancomycin|vanc)\s+(\d[\d,]+)\s*mg"
+        r"|(\d[\d,]+)\s*mg\s+(?:of\s+)?(?:vancomycin|vanc)",
         text,
         re.IGNORECASE,
     )
     for candidate in candidates:
         if _looks_like_calculated_value(text, candidate.start()):
             continue
-        raw = candidate.group(1)
+        raw = candidate.group(1) or candidate.group(2)
         mg = int(raw.replace(",", ""))
         # Only flag if it looks like a vancomycin dose (100-5000 mg range)
         if 100 <= mg <= 5000 and mg % 250 != 0:
@@ -78,14 +79,15 @@ def _check_vanc_ceiling(text: str) -> list[str]:
     """Check for single vancomycin doses exceeding 3000 mg."""
     violations = []
     candidates = re.finditer(
-        r"(?:vancomycin\s+)?(\d[\d,]+)\s*mg",
+        r"(?:vancomycin|vanc)\s+(\d[\d,]+)\s*mg"
+        r"|(\d[\d,]+)\s*mg\s+(?:of\s+)?(?:vancomycin|vanc)",
         text,
         re.IGNORECASE,
     )
     for candidate in candidates:
         if _looks_like_calculated_value(text, candidate.start()):
             continue
-        raw = candidate.group(1)
+        raw = candidate.group(1) or candidate.group(2)
         mg = int(raw.replace(",", ""))
         if mg > 3000:
             violations.append(

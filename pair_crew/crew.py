@@ -390,7 +390,9 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "and include a pharmacist, haematology, or senior clinician escalation.\n"
             "8. For NBM CBG 4.0 classification, call the NBM CBG Classifier and state "
             "that 4.0 mmol/L is in target range or at the lower boundary of target. "
-            "Do not only state that it is not hypoglycaemia."
+            "Do not only state that it is not hypoglycaemia. Cite the retrieved NBM "
+            "Guidance document and page for the target-range classification. The "
+            "calculator supplies the deterministic label but is not the citation source."
         ),
         expected_output=(
             "Complete draft answer with all citations. Calculator tool outputs quoted where arithmetic was needed. "
@@ -431,7 +433,9 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "interaction adjustment is available and escalates is not an actionable "
             "dose recommendation. Do not discard that refusal solely for a citation warning.\n\n"
             "For NBM CBG 4.0 classification, do not release an answer that only negates "
-            "hypoglycaemia. Preserve the in target range or lower boundary of target label.\n\n"
+            "hypoglycaemia. Preserve the in target range or lower boundary of target label "
+            "and its retrieved NBM Guidance document and page citation. The NBM CBG "
+            "Classifier result alone is not a citation.\n\n"
             "If violations found: return answer WITH explicit violation list. "
             "Do not release an unsafe answer."
         ),

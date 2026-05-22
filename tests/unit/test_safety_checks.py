@@ -43,3 +43,12 @@ def test_safety_does_not_warn_on_warfarin_partial_coverage_refusal() -> None:
 
     assert result.passed
     assert result.warnings == []
+
+
+def test_safety_ignores_non_vancomycin_antimicrobial_doses() -> None:
+    result = run_safety_checks(
+        "Use IV clindamycin 600 mg and IV ciprofloxacin 400 mg. "
+        "Source: Musculoskeletal_Infections.pdf, page 1."
+    )
+
+    assert result.passed

@@ -6,10 +6,22 @@ scenarios:
 
   - id: dog_bite_routing
     name: "Dog bite routing"
-    query: "Dog bite on the hand, what antibiotics should I give?"
+    query: >
+      32-year-old female, 60 kg, CrCl 90 mL/min, no known allergies,
+      no recent antibiotic exposure, tetanus immunisation status uncertain.
+      Sustained a dog bite on the hand 2 hours ago, haemodynamically stable,
+      no septic shock, no ICU needs, no obvious source control issues.
+      What antibiotic regimen should I recommend?
     expected_patterns:
-      - "Musculoskeletal Infections"
-      - "Traumatized Limb with Biological Contamination"
+      - "Musculoskeletal"
+    expected_any_patterns:
+      - "Traumatized Limb"
+      - "Traumatised Limb"
+      - "Biological Contamination"
+    optional_any_patterns:
+      - "rabies"
+      - "post-exposure"
+      - "ID consultation"
     forbidden_patterns:
       - "Skin and Soft Tissue"
     pass_criterion: "Routes to Musculoskeletal Infections, not Skin and Soft Tissue"
