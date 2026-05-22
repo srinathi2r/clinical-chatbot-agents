@@ -103,8 +103,13 @@ def _check_citations_present(text: str) -> list[str]:
     partial_coverage_refusal = (
         "partially covered" in lower
         and "warfarin" in lower
-        and "numeric" in lower
-        and ("not" in lower or "no " in lower)
+        and (
+            "numeric" in lower
+            or "interaction" in lower
+            or "dose-adjustment" in lower
+            or "dose adjustment" in lower
+        )
+        and ("not" in lower or "no " in lower or "does not" in lower)
     )
     if partial_coverage_refusal:
         return warnings

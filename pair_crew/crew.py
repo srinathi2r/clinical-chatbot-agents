@@ -146,8 +146,23 @@ from crewai import Agent, Task, Crew, Process
 from crewai.tasks.conditional_task import ConditionalTask
 
 
-def _triage_requires_context_gate(task_output) -> bool:
+def _is_already_calculated_vanc_query(query: str) -> bool:
+    """Recognize V4 category 3 vancomycin rounding requests."""
+    lower = query.lower()
+    return (
+        ("vancomycin" in lower or "vanc" in lower)
+        and "calculated" in lower
+        and (
+            "calculated dose" in lower
+            or any(term in lower for term in ("round", "rounded", "ceiling"))
+        )
+    )
+
+
+def _triage_requires_context_gate(task_output, query: str = "") -> bool:
     """Run the recommendation gate only for V4 category 2 outputs."""
+    if _is_already_calculated_vanc_query(query):
+        return False
     triage = getattr(task_output, "pydantic", None)
     if isinstance(triage, TriageOutput):
         return triage.category == RequestCategory.treatment_recommendation
@@ -162,6 +177,14 @@ def _format_context_clarification(missing_items: list[str]) -> str:
     return (
         f"Before I can recommend, I need: {missing}. "
         "Please confirm these and I will provide the recommendation."
+    )
+
+
+def _format_prompt_extraction_refusal() -> str:
+    """Render the fixed V4 Section 7.3 refusal for extraction attempts."""
+    return (
+        "I can't provide internal system instructions or hidden context. "
+        "I can help answer clinical questions using the provided guideline documents."
     )
 
 
@@ -317,7 +340,7 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
     )
 
     task_gate = ConditionalTask(
-        condition=_triage_requires_context_gate,
+        condition=lambda task_output: _triage_requires_context_gate(task_output, query),
         description=(
             f"Query: {query!r}\n\n"
             "Review the triage output from the previous task. "
@@ -388,7 +411,15 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "7. For V4 category 5 warfarin interaction requests, use the Section 13.4 "
             "partial-coverage wording exactly: start with 'Coverage status: Partially covered.' "
             "and include a pharmacist, haematology, or senior clinician escalation.\n"
-            "8. For NBM CBG 4.0 classification, call the NBM CBG Classifier and state "
+            "8. For vancomycin rounding or ceiling calculations, call the Vancomycin "
+            "Dose Rounder and cite the retrieved applicable vancomycin document and "
+            "page for the nearest-250 mg rule and ceiling. The calculator supplies "
+            "the deterministic result but is not the citation source.\n"
+            "9. For CURB-65 classification, call the CURB-65 Calculator and use its "
+            "score and severity labels. Do not compute CURB-65 points from prose or "
+            "retrieved passages. Cite the retrieved Respiratory Infections document "
+            "and page for the severity mapping.\n"
+            "10. For NBM CBG 4.0 classification, call the NBM CBG Classifier and state "
             "that 4.0 mmol/L is in target range or at the lower boundary of target. "
             "Do not only state that it is not hypoglycaemia. Cite the retrieved NBM "
             "Guidance document and page for the target-range classification. The "
@@ -432,6 +463,13 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "A partial-coverage warfarin interaction refusal that says no numeric "
             "interaction adjustment is available and escalates is not an actionable "
             "dose recommendation. Do not discard that refusal solely for a citation warning.\n\n"
+            "For vancomycin rounding or ceiling calculations, preserve the retrieved "
+            "applicable vancomycin document and page citation for the nearest-250 mg "
+            "rule and ceiling. The Vancomycin Dose Rounder result alone is not a citation.\n\n"
+            "For CURB-65 classification, preserve the CURB-65 Calculator score and "
+            "severity label. Do not replace it with a point count inferred from a "
+            "retrieved Respiratory passage. Preserve the Respiratory document and page "
+            "citation for the severity mapping.\n\n"
             "For NBM CBG 4.0 classification, do not release an answer that only negates "
             "hypoglycaemia. Preserve the in target range or lower boundary of target label "
             "and its retrieved NBM Guidance document and page citation. The NBM CBG "
@@ -464,6 +502,9 @@ def run_query(query: str, verbose: bool = False) -> str:
     """Run a query through the full crew and return the final answer."""
     crew, tasks = build_crew(query, verbose=verbose)
     result = crew.kickoff()
+    triage_output = getattr(tasks[0].output, "pydantic", None)
+    if isinstance(triage_output, TriageOutput) and triage_output.category == RequestCategory.jailbreak:
+        return _format_prompt_extraction_refusal()
     gate_output = getattr(tasks[1].output, "pydantic", None)
     if isinstance(gate_output, ContextGateOutput) and not gate_output.context_complete:
         return _format_context_clarification(gate_output.missing_items)

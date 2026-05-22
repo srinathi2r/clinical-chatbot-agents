@@ -45,6 +45,16 @@ def test_safety_does_not_warn_on_warfarin_partial_coverage_refusal() -> None:
     assert result.warnings == []
 
 
+def test_safety_does_not_warn_on_warfarin_interaction_scope_refusal() -> None:
+    result = run_safety_checks(
+        "Coverage status: Partially covered. The Warfarin Therapy Guide does not "
+        "provide a metronidazole interaction dose adjustment."
+    )
+
+    assert result.passed
+    assert result.warnings == []
+
+
 def test_safety_ignores_non_vancomycin_antimicrobial_doses() -> None:
     result = run_safety_checks(
         "Use IV clindamycin 600 mg and IV ciprofloxacin 400 mg. "
