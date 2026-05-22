@@ -5,6 +5,7 @@ import pytest
 from pair_crew.tools.calculators import (
     calc_crcl_cockcroft_gault,
     round_vanc_dose,
+    vanc_frequency_decision,
     calc_curb_65,
     nbm_cbg_classifier,
 )
@@ -75,6 +76,19 @@ class TestVancRounding:
         r = round_vanc_dose(1225)
         assert "1225" in r.rationale
         assert "1250" in r.rationale
+
+
+class TestVancFrequencyDecision:
+    @pytest.mark.parametrize("daily_mg", [2999, 3000])
+    def test_keeps_q12h_at_or_below_threshold(self, daily_mg):
+        r = vanc_frequency_decision(daily_mg)
+
+        assert r.decision == "keep_q12h"
+
+    def test_switches_q8h_above_threshold(self):
+        r = vanc_frequency_decision(3001)
+
+        assert r.decision == "switch_to_q8h"
 
 
 # ---------------------------------------------------------------------------

@@ -71,6 +71,13 @@ class VancRoundResult:
     rationale: str
 
 
+@dataclass
+class VancFrequencyResult:
+    calculated_total_daily_mg: float
+    decision: str
+    rationale: str
+
+
 def round_vanc_dose(calculated_mg: float) -> VancRoundResult:
     """
     Round to nearest 250 mg. Cap single dose at 3000 mg.
@@ -103,6 +110,36 @@ def round_vanc_dose(calculated_mg: float) -> VancRoundResult:
         rounded_mg=final_mg,
         capped=capped,
         rationale=" ".join(rationale_parts),
+    )
+
+
+def vanc_frequency_decision(calculated_total_daily_mg: float) -> VancFrequencyResult:
+    """
+    Apply the V4 non-ESRF Q12H frequency threshold.
+
+    Keep Q12H at or below 3000 mg/day. Switch to the guideline Q8H
+    strategy only when calculated total daily dose is greater than 3000 mg/day.
+    """
+    if calculated_total_daily_mg <= 0:
+        raise ValueError("calculated_total_daily_mg must be positive")
+
+    if calculated_total_daily_mg > 3000:
+        decision = "switch_to_q8h"
+        rationale = (
+            f"Calculated total daily dose {calculated_total_daily_mg:.0f} mg/day "
+            "is greater than 3000 mg/day. Use the guideline Q8H strategy."
+        )
+    else:
+        decision = "keep_q12h"
+        rationale = (
+            f"Calculated total daily dose {calculated_total_daily_mg:.0f} mg/day "
+            "does not exceed 3000 mg/day. Keep Q12H."
+        )
+
+    return VancFrequencyResult(
+        calculated_total_daily_mg=calculated_total_daily_mg,
+        decision=decision,
+        rationale=rationale,
     )
 
 

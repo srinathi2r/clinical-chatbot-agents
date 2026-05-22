@@ -56,6 +56,7 @@ from crewai.tools import tool
 from pair_crew.tools.calculators import (
     calc_crcl_cockcroft_gault,
     round_vanc_dose,
+    vanc_frequency_decision,
     calc_curb_65,
     nbm_cbg_classifier,
 )
@@ -76,6 +77,13 @@ def tool_vanc_round(calculated_mg: float) -> str:
     """Round a vancomycin dose to nearest 250 mg and apply 3000 mg ceiling."""
     r = round_vanc_dose(calculated_mg)
     return r.rationale
+
+
+@tool("Vancomycin Q12H Frequency Decision")
+def tool_vanc_frequency(calculated_total_daily_mg: float) -> str:
+    """Decide whether non-ESRF vancomycin stays Q12H or switches to the Q8H strategy."""
+    r = vanc_frequency_decision(calculated_total_daily_mg)
+    return f"Decision: {r.decision}. {r.rationale}"
 
 
 @tool("CURB-65 Calculator")
@@ -191,7 +199,7 @@ def _format_prompt_extraction_refusal() -> str:
 def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
     llm = _get_llm()
 
-    calc_tools = [tool_crcl, tool_vanc_round, tool_curb65, tool_cbg]
+    calc_tools = [tool_crcl, tool_vanc_round, tool_vanc_frequency, tool_curb65, tool_cbg]
     retrieval_tools = [tool_retrieve]
     safety_tools = [tool_safety]
 
@@ -402,6 +410,8 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "2. For ALL arithmetic: call the appropriate Python calculator tool. Never do mental arithmetic.\n"
             "   - CrCl: use CrCl Calculator\n"
             "   - Vancomycin rounding: use Vancomycin Dose Rounder\n"
+            "   - Vancomycin non-ESRF Q12H frequency threshold: use "
+            "Vancomycin Q12H Frequency Decision\n"
             "   - CURB-65: use CURB-65 Calculator\n"
             "   - CBG classification: use NBM CBG Classifier\n"
             "3. List every component of multi-drug regimens (including oral components).\n"
@@ -415,11 +425,15 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "Dose Rounder and cite the retrieved applicable vancomycin document and "
             "page for the nearest-250 mg rule and ceiling. The calculator supplies "
             "the deterministic result but is not the citation source.\n"
-            "9. For CURB-65 classification, call the CURB-65 Calculator and use its "
+            "9. For a non-ESRF vancomycin Q12H frequency threshold question, call "
+            "Vancomycin Q12H Frequency Decision and use its keep_q12h or "
+            "switch_to_q8h output verbatim. The trigger is only greater than "
+            "3000 mg/day. Exactly 3000 mg/day stays Q12H.\n"
+            "10. For CURB-65 classification, call the CURB-65 Calculator and use its "
             "score and severity labels. Do not compute CURB-65 points from prose or "
             "retrieved passages. Cite the retrieved Respiratory Infections document "
             "and page for the severity mapping.\n"
-            "10. For NBM CBG 4.0 classification, call the NBM CBG Classifier and state "
+            "11. For NBM CBG 4.0 classification, call the NBM CBG Classifier and state "
             "that 4.0 mmol/L is in target range or at the lower boundary of target. "
             "Do not only state that it is not hypoglycaemia. Cite the retrieved NBM "
             "Guidance document and page for the target-range classification. The "
@@ -466,6 +480,9 @@ def build_crew(query: str, verbose: bool = False) -> tuple[Crew, list[Task]]:
             "For vancomycin rounding or ceiling calculations, preserve the retrieved "
             "applicable vancomycin document and page citation for the nearest-250 mg "
             "rule and ceiling. The Vancomycin Dose Rounder result alone is not a citation.\n\n"
+            "For the non-ESRF vancomycin Q12H frequency threshold, preserve the "
+            "Vancomycin Q12H Frequency Decision output verbatim. If it says keep_q12h "
+            "at exactly 3000 mg/day, do not rewrite that as a Q8H trigger.\n\n"
             "For CURB-65 classification, preserve the CURB-65 Calculator score and "
             "severity label. Do not replace it with a point count inferred from a "
             "retrieved Respiratory passage. Preserve the Respiratory document and page "
